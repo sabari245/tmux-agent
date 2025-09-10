@@ -124,3 +124,74 @@ def get_tmux_history(context: TmuxContext | None) -> str | None:
             pass
 
     return None
+
+
+def send_keys_to_pane(
+    context: TmuxContext | None,
+    keys: str,
+    enter: bool = True,
+    suppress_history: bool = False,
+    literal: bool = False,
+) -> bool:
+    """
+    Send keystrokes to the pane in `context`.
+
+    Parameters
+    - context: A `TmuxContext` returned from `get_tmux_context()` (or None).
+    - keys: The key sequence or command to send (e.g. 'echo hello').
+    - enter: If True, press Enter after sending the keys.
+    - suppress_history: If True, prefix the command with a space to avoid
+      adding it to the shell history (where supported).
+    - literal: If True, send the keys as literal characters (pass through
+      libtmux Pane.send_keys literal argument when available).
+
+    Returns True on success, False if the context or pane could not be resolved
+    or if sending keys failed.
+    """
+    if not context:
+        return False
+
+    pane = context.get("pane")
+    if not pane:
+        return False
+
+    # Prepare the command to send
+    payload = keys
+    if suppress_history and not payload.startswith(" "):
+        payload = " " + payload
+
+    # Prefer using libtmux Pane.send_keys when available
+    try:
+        send_keys_fn = getattr(pane, "send_keys", None)
+        if callable(send_keys_fn):
+            # Some libtmux versions accept `enter` and `suppress_history` or
+            # `literal` arguments; attempt the most expressive call first.
+            try:
+                # Try full signature
+                send_keys_fn(
+                    payload,
+                    enter=enter,
+                    suppress_history=suppress_history,
+                    literal=literal,
+                )
+            except TypeError:
+                try:
+                    # Older libtmux: no suppress_history/literal
+                    send_keys_fn(payload, enter=enter)
+                except TypeError:
+                    # Fallback: single arg
+                    send_keys_fn(payload)
+            return True
+    except Exception:
+        # Fall through to tmux CLI fallback
+        pass
+
+    # Fallback: use tmux send-keys command
+    try:
+        cmd = ["tmux", "send-keys", "-t", str(getattr(pane, "pane_id", "")), payload]
+        if enter:
+            cmd.append("Enter")
+        subprocess.run(cmd, check=True, stderr=subprocess.DEVNULL)
+        return True
+    except Exception:
+        return False

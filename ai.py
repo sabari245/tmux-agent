@@ -1,4 +1,4 @@
-from utility_tmux import get_tmux_context, get_tmux_history
+from utility_tmux import get_tmux_context, get_tmux_history, send_keys_to_pane
 
 
 def main():
@@ -9,6 +9,8 @@ def main():
             print("history:", history)
         else:
             print("no history")
+
+        send_keys_to_pane(ctx, "echo 'hello'", suppress_history=True)
 
 
 if __name__ == "__main__":
