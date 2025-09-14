@@ -1,4 +1,4 @@
-from utility_tmux import get_tmux_context, get_tmux_history, send_keys_to_pane
+from utility import get_tmux_context, get_tmux_history, send_keys_to_pane
 
 
 def main():
